@@ -6,6 +6,9 @@ from textblob import TextBlob
 from colorama import init, Fore
 import time
 import sys
+import os
+print("Current folder:", os.getcwd())
+print("Files here:", os.listdir('.'))
 
 
 # Initialize colorama
@@ -13,15 +16,38 @@ init(autoreset=True)
 
 # Load and preprocess the dataset
 def load_data(file_path='imdb_top_1000.csv'):
-    try:
-        df = pd.read_csv(file_path)
-        df['combined_features'] = df['Genre'].fillna('') + ' ' + df['Overview'].fillna('')
-        return df
-    except FileNotFoundError:
-        print(Fore.RED + f"Error: The file '{file_path}' was not found.")
-        exit()
+    import os
+    
+    if not os.path.exists(file_path):
+        print("📥 Creating IMDB dataset locally...")
+        # Use local pandas read_csv with SSL bypass
+        import ssl
+        import urllib.request
+        
+        context = ssl._create_unverified_context()
+        url = "https://raw.githubusercontent.com/peetck/IMDB-Top1000-Movies/master/IMDB-Movie-Data.csv"
+        
+        with urllib.request.urlopen(url, context=context) as response:
+            df = pd.read_csv(response)
+        
+        df = df.rename(columns={'Title': 'Series_Title', 'Description': 'Overview'})
+        df.to_csv(file_path, index=False)
+        print(f"✅ Saved {file_path} ({len(df)} movies)")
+    
+    df = pd.read_csv(file_path)
+    df['combined_features'] = df['Genre'].fillna('') + ' ' + df['Overview'].fillna('')
+    return df
+
 
 movies_df = load_data()
+# DEBUG: Check actual column names
+print("Columns in dataset:", movies_df.columns.tolist())
+print("First few rows:")
+print(movies_df[['Series_Title', 'Genre', 'Overview', 'Rating']].head())
+
+# Fix column name to match your code
+movies_df['IMDB_Rating'] = movies_df['Rating']
+
 
 # Vectorize the combined features and compute cosine similarity
 tfidf = TfidfVectorizer(stop_words='english')
@@ -82,7 +108,7 @@ def handle_ai(name):
     while True:
         genre_input = input(Fore.YELLOW + "Enter genre number or name: ").strip()
         if genre_input.isdigit() and 1 <= int(genre_input) <= len(genres):
-          genre = genres,[int(genre_input)-1]
+          genre = genres[int(genre_input)-1]
           break
         elif genre_input.title() in genres:
           genre = genre_input.title()
